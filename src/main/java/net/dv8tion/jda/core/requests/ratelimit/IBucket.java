@@ -17,11 +17,12 @@
 package net.dv8tion.jda.core.requests.ratelimit;
 
 import net.dv8tion.jda.core.requests.Request;
+import net.dv8tion.jda.core.requests.Route.CompiledRoute;
 
 import java.util.Queue;
 
 public interface IBucket
 {
-    String getRoute();
+    CompiledRoute getRoute();
     Queue<Request> getRequests();
 }

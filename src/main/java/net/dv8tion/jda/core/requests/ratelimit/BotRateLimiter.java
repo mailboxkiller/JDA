@@ -47,7 +47,7 @@ public class BotRateLimiter extends RateLimiter
     @Override
     public Long getRateLimit(CompiledRoute route)
     {
-        Bucket bucket = getBucket(route.getRatelimitRoute());
+        Bucket bucket = getBucket(route);
         synchronized (bucket)
         {
             return bucket.getRateLimit();
@@ -59,7 +59,7 @@ public class BotRateLimiter extends RateLimiter
     {
         if (isShutdown)
             throw new RejectedExecutionException("Cannot queue a request after shutdown");
-        Bucket bucket = getBucket(request.getRoute().getRatelimitRoute());
+        Bucket bucket = getBucket(request.getRoute());
         synchronized (bucket)
         {
             bucket.addToQueue(request);
@@ -69,7 +69,7 @@ public class BotRateLimiter extends RateLimiter
     @Override
     protected Long handleResponse(CompiledRoute route, HttpResponse<String> response)
     {
-        Bucket bucket = getBucket(route.getRatelimitRoute());
+        Bucket bucket = getBucket(route);
         synchronized (bucket)
         {
             Headers headers = response.getHeaders();
@@ -107,18 +107,18 @@ public class BotRateLimiter extends RateLimiter
 
     }
 
-    private Bucket getBucket(String route)
+    private Bucket getBucket(CompiledRoute route)
     {
-        Bucket bucket = (Bucket) buckets.get(route);
+        Bucket bucket = (Bucket) buckets.get(route.getRatelimitRoute());
         if (bucket == null)
         {
             synchronized (buckets)
             {
-                bucket = (Bucket) buckets.get(route);
+                bucket = (Bucket) buckets.get(route.getRatelimitRoute());
                 if (bucket == null)
                 {
                     bucket = new Bucket(route);
-                    buckets.put(route, bucket);
+                    buckets.put(route.getRatelimitRoute(), bucket);
                 }
             }
         }
@@ -157,8 +157,17 @@ public class BotRateLimiter extends RateLimiter
     {
         try
         {
-            bucket.resetTime = Long.parseLong(headers.getFirst("X-RateLimit-Reset")) * 1000; //Seconds to milliseconds
-            bucket.routeUsageLimit = Integer.parseInt(headers.getFirst("X-RateLimit-Limit"));
+            if (bucket.getRoute().getBaseRoute().getRatelimit() != null) // Check if there's a hardcoded rate limit 
+            {
+                bucket.resetTime = bucket.getRoute().getBaseRoute().getRatelimit().getResetTime();
+                bucket.routeUsageLimit = bucket.getRoute().getBaseRoute().getRatelimit().getUsageLimit();
+            }
+            else
+            {
+                bucket.resetTime = Long.parseLong(headers.getFirst("X-RateLimit-Reset")) * 1000; //Seconds to milliseconds
+                bucket.routeUsageLimit = Integer.parseInt(headers.getFirst("X-RateLimit-Limit"));
+            }
+
             bucket.routeUsageRemaining = Integer.parseInt(headers.getFirst("X-RateLimit-Remaining"));
 
         }
@@ -178,13 +187,13 @@ public class BotRateLimiter extends RateLimiter
 
     private class Bucket implements IBucket, Runnable
     {
-        final String route;
+        final CompiledRoute route;
         volatile long resetTime = 0;
         volatile int routeUsageRemaining = 1;    //These are default values to only allow 1 request until we have properly
         volatile int routeUsageLimit = 1;        // ratelimit information.
         volatile ConcurrentLinkedQueue<Request> requests = new ConcurrentLinkedQueue<>();
 
-        public Bucket(String route)
+        public Bucket(CompiledRoute route)
         {
             this.route = route;
         }
@@ -314,7 +323,7 @@ public class BotRateLimiter extends RateLimiter
         }
 
         @Override
-        public String getRoute()
+        public CompiledRoute getRoute()
         {
             return route;
         }
