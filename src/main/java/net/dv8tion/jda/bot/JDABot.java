@@ -16,9 +16,19 @@
 
 package net.dv8tion.jda.bot;
 
+import net.dv8tion.jda.bot.entities.ApplicationInfo;
 import net.dv8tion.jda.core.JDA;
+import net.dv8tion.jda.core.requests.RestAction;
 
 public interface JDABot
 {
     JDA getJDA();
+
+    /**
+     * Retrieves the application that owns the logged in Bot-account.
+     *
+     * @return
+     *      The {@link ApplicationInfo} of the bot account.
+     */
+    public RestAction<ApplicationInfo> getApplicationInfo();
 }
